@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `enable_ios` INT(1) NOT NULL DEFAULT '1' AFTER `device_identifier`;
