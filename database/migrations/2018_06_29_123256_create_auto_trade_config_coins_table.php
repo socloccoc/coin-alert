@@ -15,7 +15,8 @@ class CreateAutoTradeConfigCoinsTable extends Migration
     {
         Schema::create('auto_trade_config_coins', function (Blueprint $table) {
             $table->increments('id');
-            $table->integer('coin_id')->unique();
+            $table->integer('coin_id');
+            $table->integer('user_id');
             $table->string('coin_name', 50);
             $table->string('pair', 50);
             $table->float('amount', 18, 8);

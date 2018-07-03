@@ -3,6 +3,10 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use App\Repository\Contracts\AutoTradeConfigCoinInterface;
+use App\Repository\Contracts\AutoTradeHistoryInterface;
+use App\Repository\Contracts\UserInterface;
+use Binance;
 
 class ScheduleCheckOrderStatus extends Command
 {

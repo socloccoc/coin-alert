@@ -30,6 +30,7 @@ class CheckBinanceApi extends Command
      */
     public function __construct(AutoTradeService $autoTradeService)
     {
+        ini_set('memory_limit', '-1');
         $this->autoTradeService = $autoTradeService;
         parent::__construct();
     }
@@ -79,6 +80,6 @@ class CheckBinanceApi extends Command
             "created_at" => '',
             "updated_at" => "2018-03-19 07:52:51"];
 
-        $this->autoTradeService->buy($coin, $user);
+       // $this->autoTradeService->buy($coin, $user);
     }
 }

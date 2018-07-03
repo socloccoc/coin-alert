@@ -16,6 +16,7 @@ class CreateAutoTradeHistoriesTable extends Migration
         Schema::create('auto_trade_histories', function (Blueprint $table) {
             $table->increments('id');
             $table->integer('coin_id');
+            $table->integer('user_id');
             $table->string('coin_name', 50);
             $table->string('pair', 50);
             $table->string('buy_order_id', 255);

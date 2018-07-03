@@ -29,6 +29,13 @@ class AutoTradeService
         $this->users = $users;
     }
 
+    /**
+     * Attempts to create a currency order each currency supports a number of order types, such as -LIMIT -MARKET
+     *
+     * @param $coin ( is array with information of coin being ordered )
+     * @param $user ( is array with information of user )
+     * return void
+     */
     public function buy($coin, $user)
     {
         CommonFunctions::_log('auto-trade', "\t" . '------------------ ' . $coin['coin_name'] . $coin['pair'] . '-buy-order --------------------');
@@ -82,34 +89,83 @@ class AutoTradeService
             $this->users->update(['check_amount' => 1], $user['id']);
         } else {
             if ($user['check_amount'] == 1) {
-                CommonFunctions::_log('auto-trade', "\t BTC not enough");
+                CommonFunctions::_log('auto-trade', "\t " . $coin['coin_name'] . " not enough");
             }
             $this->users->update(['check_amount' => 0], $user['id']);
         }
         CommonFunctions::_log('auto-trade', "\t" . '---------------------------------------------------------' . "\n");
     }
 
+    /**
+     * Attempts to create a currency order each currency supports a number of order types, such as -LIMIT -MARKET
+     *
+     * @param $coin ( is array with information of coin being ordered )
+     * @param $user ( is array with information of user )
+     * return void
+     */
     public function sell($coin, $user)
     {
         CommonFunctions::_log('auto-trade', "\t" . '------------------ ' . $coin['coin_name'] . $coin['pair'] . '-sell-order --------------------');
+
         $buyOrder = $this->autoTradeHistory->checkOrderBuyExist($user['id'], $coin['coin_id']);
-        dd($buyOrder);
-        $pairBalance = $this->balances($coin['pair']);
-        if (isset($pairBalance['code'])){
-            CommonFunctions::_log('auto-trade', "\t" . $pairBalance['msg']);
-            CommonFunctions::_log('auto-trade', "\t" . '---------------------------------------------------------' . "\n");
+        if ($buyOrder == null) {
+            CommonFunctions::_log('auto-trade', "\t Buy_order is not exist ");
             return;
-        };
-        if ($pairBalance >= 0) {
-            $fullName = $coin['coin_name'] . $coin['pair'];
-            $price = $this->getBookPrices($fullName, 'bid');
-            $amount = $coin['amount'];
-        } else {
-            // ghi log
         }
 
+        $pairBalance = $this->balances($coin['pair']);
+        if (isset($pairBalance['code'])) {
+            CommonFunctions::_log('auto-trade', "\t" . $pairBalance['msg']);
+            return;
+        };
 
+        if ($pairBalance > 0) {
+            $fullName = $coin['coin_name'] . $coin['pair'];
+//            $price = $this->getBookPrices($fullName, 'bid');
+            $price = 3000;
+            $amount = $pairBalance / $price;
+            try {
+                $this->api->useServerTime();
+                $order = $this->api->buy($fullName, $amount, $price);
+                if (!isset($order['code'])) {
+                    $orderDetail = [
+                        'sell_order_id' => $order['orderId'],
+                        'sell_price' => $order['price'],
+                        'sell_time' => date('Y-m-d H:i:s', $order['transactTime'] / 1000),
+                        'status' => $order['status']
+                    ];
+                    $tradeHistory = $this->autoTradeHistory->update($orderDetail, $buyOrder['id']);
+                    if ($tradeHistory) {
+                        CommonFunctions::_log('auto-trade', "\t order success !");
+                    }
+                } else {
+                    CommonFunctions::_log('auto-trade', "\t msg : " . $order['msg']);
+                }
+            } catch (\Exception $e) {
+                CommonFunctions::_log('auto-trade', "\t" . $e->getMessage());
+            }
+        } else {
+            CommonFunctions::_log('auto-trade', "\t " . $coin['pair'] . " not enough");
+        }
     }
+
+    public function checkOrderStatus()
+    {
+        $autoTradeUsers = $this->users->findUsersAutoTrade();
+
+        if (count($autoTradeUsers) <= 0) return;
+
+        foreach ($autoTradeUsers as $index => $user) {
+            $orders = $this->autoTradeHistory->orderCoinsByUser($user['id']);
+            if ($orders == null) return;
+            foreach ($orders as $order) {
+                $fullName = $order['coin_name'].$order['pair'];
+
+                $orderStatus = $this->checkOrderStatus($fullName, $order['order_id']);
+            }
+        }
+    }
+
 
     /**
      *  Get BTC balances for the account assets
@@ -134,6 +190,7 @@ class AutoTradeService
 
         return $binanceAccountInfo;
     }
+
 
     /**
      * bookPrices get bid/ask prices
@@ -172,7 +229,7 @@ class AutoTradeService
      * @param $orderid ( 123456789 )
      * @return array with error message or the order status
      */
-    public function getOrdersStatus($pair, $orderid)
+    public function getOrdersStatusByOrderId($pair, $orderid)
     {
         $this->api->useServerTime();
 
@@ -195,59 +252,24 @@ class AutoTradeService
      */
     public function cancelOrder($pair, $orderId)
     {
-        while (true) {
-            $this->api->useServerTime();
-            $order = $this->api->cancel($pair, $orderId);
-            if (!isset($order['code'])) {
-                return $order['orderId'];
-            }
+        $this->api->useServerTime();
+        $order = $this->api->cancel($pair, $orderId);
+        if (!isset($order['code'])) {
+            return $order['orderId'];
         }
+        return $order;
     }
-//
-//    public function getMyTradeHistory($pair)
-//    {
-//            return $this->query(
-//                    array(
-//                            'command' => 'returnTradeHistory',
-//                            'currencyPair' => strtoupper($pair)
-//                    )
-//            );
-//    }
 
-//    public function sell($pair, $rate, $amount)
-//    {
-//            return $this->query(
-//                    array(
-//                            'command' => 'sell',
-//                            'currencyPair' => strtoupper($pair),
-//                            'rate' => $rate,
-//                            'amount' => $amount
-//                    )
-//            );
-//    }
-//
-//    public function cancelOrder($pair, $order_number)
-//    {
-//            return $this->query(
-//                    array(
-//                            'command' => 'cancelOrder',
-//                            'currencyPair' => strtoupper($pair),
-//                            'orderNumber' => $order_number
-//                    )
-//            );
-//    }
-//
-//    public function withDraw($currency, $amount, $address)
-//    {
-//            return $this->query(
-//                    array(
-//                            'command' => 'withdraw',
-//                            'currency' => strtoupper($currency),
-//                            'amount' => $amount,
-//                            'address' => $address
-//                    )
-//            );
-//    }
+    /**
+     * Writes the values of certain variables along with a message in a log file
+     * @param $log_msg
+     * @return void
+     */
+    public function writeLog($log_msg)
+    {
+        CommonFunctions::_log('auto-trade', "\t" . $log_msg);
+        CommonFunctions::_log('auto-trade', "\t" . '---------------------------------------------------------' . "\n");
+    }
 
 
 }
